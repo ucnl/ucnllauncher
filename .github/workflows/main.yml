@@ -1,0 +1,49 @@
+name: SonarQube .NET analysis
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+
+jobs:
+  sonar-dotnet:
+    runs-on: [self-hosted, windows]
+
+    env:
+      SONAR_HOST_URL: "http://192.168.7.179:9000"
+      SONAR_PROJECT_KEY: "ucnl_AzimuthConsole_2e48da76-e8ca-48b2-a240-e62bb4b0eb05"
+      SONAR_PROJECT_NAME: "ucnl/AzimuthConsole"
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+    steps:
+      - name: Checkout AzimuthConsole
+        uses: actions/checkout@v4
+
+      - name: Add dotnet tools to PATH
+        run: echo "$env:USERPROFILE\.dotnet\tools" >> $env:GITHUB_PATH
+
+      - name: Install / Update SonarScanner for .NET
+        run: |
+          dotnet tool update --global dotnet-sonarscanner 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            dotnet tool install --global dotnet-sonarscanner
+          }
+          dotnet tool list -g
+
+      - name: SonarQube begin
+        run: |
+          dotnet sonarscanner begin `
+            /k:"$env:SONAR_PROJECT_KEY" `
+            /n:"$env:SONAR_PROJECT_NAME" `
+            /d:sonar.host.url="$env:SONAR_HOST_URL" `
+            /d:sonar.token="$env:SONAR_TOKEN"
+
+      - name: Build AzimuthConsole
+        shell: powershell
+        working-directory: src
+        run: dotnet build AzimuthConsole.csproj -c Release      
+
+      - name: SonarQube end
+        run: dotnet sonarscanner end /d:sonar.token="$env:SONAR_TOKEN"

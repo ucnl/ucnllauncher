@@ -1,0 +1,22 @@
+<svg width="456" height="456" viewBox="0 0 456 456" xmlns="http://www.w3.org/2000/svg">
+	<defs>
+		<linearGradient id="grad" x1="0%" y1="0%" x2="0%" y2="100%">
+			<stop offset="0%" stop-color="#ff3b30"/>
+			<stop offset="100%" stop-color="#007aff"/>
+		</linearGradient>
+	</defs>
+
+	<!-- Буква U -->
+	<path d="M120,140 
+             L120,280 
+             Q120,340 200,340 
+             Q280,340 280,280 
+             L280,140
+             L232,140
+             L232,280
+             Q232,300 200,300
+             Q168,300 168,280
+             L168,140
+             Z"
+          fill="url(#grad)"/>
+</svg>

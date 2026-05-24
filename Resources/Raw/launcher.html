@@ -1,0 +1,197 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>UCNL Tools Launcher</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+        }
+
+            .header h1 {
+                font-size: 28px;
+                margin-bottom: 8px;
+                letter-spacing: 2px;
+            }
+
+            .header p {
+                font-size: 14px;
+                opacity: 0.7;
+            }
+
+        .apps-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .app-card {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 24px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+            .app-card:active {
+                transform: scale(0.98);
+                background: rgba(255, 255, 255, 0.15);
+            }
+
+        .app-icon {
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            flex-shrink: 0;
+        }
+
+        .app-info {
+            flex: 1;
+        }
+
+        .app-name {
+            font-size: 18px;
+            font-weight: 600;
+            color: white;
+            margin-bottom: 4px;
+        }
+
+        .app-desc {
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .app-arrow {
+            color: rgba(255, 255, 255, 0.3);
+            font-size: 20px;
+        }
+
+        .status-bar {
+            text-align: center;
+            margin-top: 30px;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 13px;
+        }
+
+        .status-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 8px;
+            background: #ff6b6b;
+        }
+
+            .status-dot.connected {
+                background: #51cf66;
+            }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⚡ UCNL Launcher</h1>
+            <p>Утилиты для работы с оборудованием <a href="https://docs.unavlab.com" target="_blank" style="color: #90caf9; text-decoration: none;">UC&amp;NL</a></p>
+        </div>
+
+        <div class="apps-grid">
+            <div class="app-card" onclick="launchApp('uWaver')">
+                <div class="app-icon">📡</div>
+                <div class="app-info">
+                    <div class="app-name">uWaver</div>
+                    <div class="app-desc">Приложение для работы с модемами uWave</div>
+                </div>
+                <div class="app-arrow">→</div>
+            </div>
+
+            <div class="app-card" onclick="launchApp('RedPhoneDXConfig')">
+                <div class="app-icon">📱</div>
+                <div class="app-info">
+                    <div class="app-name">RedPhoneDX Config</div>
+                    <div class="app-desc">Конфигуратор водолазных станций связи RedPhone-DX</div>
+                </div>
+                <div class="app-arrow">→</div>
+            </div>
+
+            <div class="app-card" onclick="launchApp('uConsole')">
+                <div class="app-icon">💻</div>
+                <div class="app-info">
+                    <div class="app-name">uConsole</div>
+                    <div class="app-desc">Универсальная консоль</div>
+                </div>
+                <div class="app-arrow">→</div>
+            </div>
+        </div>
+
+        <div class="status-bar">
+            <span class="status-dot" id="statusDot"></span>
+            <span id="statusText">Проверка USB...</span>
+        </div>
+    </div>
+
+    <script>
+        // Функция launchApp будет переопределена из C# через EvaluateJavaScriptAsync
+        // Здесь оставляем заглушку на случай, если мост ещё не загрузился
+        window.originalLaunchApp = function (appName) {
+            window.location.href = 'app://' + appName;
+        };
+
+        if (typeof window.launchApp === 'undefined') {
+            window.launchApp = window.originalLaunchApp;
+        }
+
+        // Функция обновления статуса USB (вызывается из C#)
+        window.updateUsbStatus = function (connected) {
+            var dot = document.getElementById('statusDot');
+            var text = document.getElementById('statusText');
+
+            if (connected) {
+                dot.className = 'status-dot connected';
+                text.textContent = 'USB устройство подключено';
+            } else {
+                dot.className = 'status-dot';
+                text.textContent = 'USB устройство не найдено';
+            }
+        };
+    </script>
+</body>
+</html>
