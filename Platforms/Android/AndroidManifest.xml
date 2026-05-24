@@ -1,25 +1,41 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application 
-        android:allowBackup="true" 
-        android:icon="@mipmap/appicon" 
-        android:roundIcon="@mipmap/appicon_round" 
-        android:supportsRtl="true">
-        
-        <activity 
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.unavlab.ucnllauncher"
+    android:versionCode="1"
+    android:versionName="1.0">
+
+	<!-- Оборудование требует USB Host режима -->
+	<uses-feature android:name="android.hardware.usb.host" android:required="true" />
+
+	<!-- Базовые разрешения для работы сети -->
+	<uses-permission android:name="android.permission.INTERNET" />
+	<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+	<application
+        android:allowBackup="true"
+        android:icon="@mipmap/appicon"
+        android:roundIcon="@mipmap/appicon_round"
+        android:supportsRtl="true"
+        android:label="UC&amp;NL Launcher"
+        android:theme="@style/MainTheme">
+
+		<activity
             android:name=".MainActivity"
             android:exported="true">
-            <intent-filter>
-                <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
-            </intent-filter>
-            <meta-data 
+
+			<!-- Фильтр для запуска приложения из меню (обязательно!) -->
+			<intent-filter>
+				<action android:name="android.intent.action.MAIN" />
+				<category android:name="android.intent.category.LAUNCHER" />
+			</intent-filter>
+
+			<!-- Ваш существующий фильтр для USB -->
+			<intent-filter>
+				<action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
+			</intent-filter>
+			<meta-data
                 android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"
                 android:resource="@xml/device_filter" />
-        </activity>
-    </application>
-    
-    <uses-feature android:name="android.hardware.usb.host" android:required="true" />
-    
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+		</activity>
+	</application>
 </manifest>

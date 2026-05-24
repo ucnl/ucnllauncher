@@ -11,15 +11,18 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 
+		<AndroidPackageFormat>apk</AndroidPackageFormat>
+
 		<!-- Display name -->
-		<ApplicationTitle>UCNL Launcher</ApplicationTitle>
+		<ApplicationTitle>UC&amp;NL Launcher</ApplicationTitle>
 
 		<!-- App Identifier -->
-		<ApplicationId>com.ucnl.uartlauncher</ApplicationId>
+		<ApplicationId>com.unavlab.ucnllauncher</ApplicationId>
 
 		<!-- Versions -->
 		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
 		<ApplicationVersion>1</ApplicationVersion>
+		<Version>1.0</Version>
 
 		<!-- Минимальная версия Android 5.0 (API 21) для поддержки USB Host -->
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21.0</SupportedOSPlatformVersion>
