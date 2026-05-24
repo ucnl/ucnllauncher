@@ -2,7 +2,7 @@
 
 	<PropertyGroup>
 		<!-- Оставляем только Android, так как это наша целевая платформа -->
-		<TargetFrameworks>net8.0-android</TargetFrameworks>
+		<TargetFrameworks>net8.0-android</TargetFrameworks>		
 
 		<OutputType>Exe</OutputType>
 		<RootNamespace>UCNLLauncher</RootNamespace>
@@ -26,6 +26,22 @@
 
 		<!-- Минимальная версия Android 5.0 (API 21) для поддержки USB Host -->
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21.0</SupportedOSPlatformVersion>
+		<AndroidSigningKeyStore>my-release-key.keystore</AndroidSigningKeyStore>
+		
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net8.0-android|AnyCPU'">
+	  <AndroidKeyStore>True</AndroidKeyStore>
+	  <AndroidSigningStorePass>Unavlab1</AndroidSigningStorePass>
+	  <AndroidSigningKeyAlias>unavlabkey</AndroidSigningKeyAlias>
+	  <AndroidSigningKeyPass>Unavlab1</AndroidSigningKeyPass>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net8.0-android|AnyCPU'">
+	  <AndroidKeyStore>True</AndroidKeyStore>
+	  <AndroidSigningStorePass>Unavlab1</AndroidSigningStorePass>
+	  <AndroidSigningKeyAlias>unavlabkey</AndroidSigningKeyAlias>
+	  <AndroidSigningKeyPass>Unavlab1</AndroidSigningKeyPass>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -48,7 +64,7 @@
 
 	<!-- Добавляем явные разрешения Android -->
 	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
-		<AndroidManifest Include="Platforms\Android\AndroidManifest.xml" />
+	<AndroidManifest Include="Platforms\Android\AndroidManifest.xml" />
 	</ItemGroup>
 	<ItemGroup>
 	  <None Remove="Resources\xml\device_filter.xml" />

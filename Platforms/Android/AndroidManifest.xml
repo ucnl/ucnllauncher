@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.unavlab.ucnllauncher"
     android:versionCode="1"
@@ -21,13 +21,7 @@
 
 		<activity
             android:name=".MainActivity"
-            android:exported="true">
-
-			<!-- Фильтр для запуска приложения из меню (обязательно!) -->
-			<intent-filter>
-				<action android:name="android.intent.action.MAIN" />
-				<category android:name="android.intent.category.LAUNCHER" />
-			</intent-filter>
+            android:exported="true">			
 
 			<!-- Ваш существующий фильтр для USB -->
 			<intent-filter>
