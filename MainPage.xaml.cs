@@ -26,14 +26,13 @@ public partial class MainPage : ContentPage
         _usbService = new UsbService();
         _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
         MainWebView.Navigating += OnNavigating;
-        MainWebView.Navigated += OnNavigated;       
+        MainWebView.Navigated += OnNavigated;
 
+        ConfigureWebView(); 
         LoadLauncher();
-
-        ConfigureWebViewCache();
     }
 
-    private void ConfigureWebViewCache()
+    private void ConfigureWebView()
     {
 #if ANDROID
         MainWebView.HandlerChanged += (s, e) =>
@@ -41,10 +40,27 @@ public partial class MainPage : ContentPage
             if (MainWebView.Handler?.PlatformView is Android.Webkit.WebView androidWebView)
             {
                 androidWebView.Settings.CacheMode = Android.Webkit.CacheModes.CacheElseNetwork;
+
+                // Разрешить геолокацию в WebView
+                androidWebView.Settings.SetGeolocationEnabled(true);
+                androidWebView.Settings.SetGeolocationDatabasePath(
+                    Android.App.Application.Context.FilesDir.Path);
+
+                androidWebView.SetWebChromeClient(new GeolocationWebChromeClient());
             }
         };
 #endif
     }
+
+#if ANDROID
+    public class GeolocationWebChromeClient : Android.Webkit.WebChromeClient
+    {
+        public override void OnGeolocationPermissionsShowPrompt(string origin, Android.Webkit.GeolocationPermissions.ICallback callback)
+        {
+            callback.Invoke(origin, true, false);
+        }
+    }
+#endif
 
     private void LoadLauncher()
     {
@@ -183,66 +199,31 @@ public partial class MainPage : ContentPage
     {
         try
         {
-            bool isAzimuthSuite = _currentAppName == "AzimuthWebSuite";
-
-            string serialApi = isAzimuthSuite ? @"
-            navigator.serial = {
-                _port: null,
-                _portId: 'azm',
-                _getPort: function(id) {
-                    if (!this._port || this._portId !== id) {
-                        this._portId = id;
-                        this._port = {
-                            id: id,
-                            readable: new ReadableStream({ start: c => window._stubController = c }),
-                            writable: new WritableStream({ write: chunk => {
-                                var t = typeof chunk === 'string' ? chunk : new TextDecoder().decode(chunk);
-                                var iframe = document.createElement('iframe');
-                                iframe.style.display = 'none';
-                                iframe.src = 'uart://write?' + encodeURIComponent(id === 'gnss' ? '1|' + t : '0|' + t);
-                                document.body.appendChild(iframe);
-                                setTimeout(function() { document.body.removeChild(iframe); }, 100);
-                            }}),
-                            open: () => Promise.resolve(),
-                            close: () => Promise.resolve()
-                        };
-                    }
-                    return this._port;
+            string serialApi = @"
+        var createSerialPort = function(portId) {
+            return {
+                requestPort: function() {
+                    return Promise.resolve({
+                        readable: new ReadableStream({ start: function(c) { window['_stubController' + portId] = c; } }),
+                        writable: new WritableStream({ write: function(chunk) {
+                            var t = typeof chunk === 'string' ? chunk : new TextDecoder().decode(chunk);
+                            var iframe = document.createElement('iframe');
+                            iframe.style.display = 'none';
+                            iframe.src = 'uart://write?' + encodeURIComponent(portId + '|' + t);
+                            document.body.appendChild(iframe);
+                            setTimeout(function() { document.body.removeChild(iframe); }, 100);
+                        }}),
+                        open: function() { return Promise.resolve(); },
+                        close: function() { return Promise.resolve(); }
+                    });
                 },
-                requestPort: function() { return Promise.resolve(navigator.serial._getPort('azm')); },
-                getPorts: function() { return Promise.resolve([navigator.serial._getPort('azm')]); }
+                getPorts: function() { return Promise.resolve([]); }
             };
-            navigator.serial2 = {
-                requestPort: function() { return Promise.resolve(navigator.serial._getPort('gnss')); },
-                getPorts: function() { return Promise.resolve([navigator.serial._getPort('gnss')]); }
-            };
-            window._uartDataReceived = function(d) {};
-        " : @"
-            navigator.serial = {
-                _port: null,
-                _getPort: function() {
-                    if (!this._port) {
-                        this._port = {
-                            readable: new ReadableStream({ start: c => window._stubController = c }),
-                            writable: new WritableStream({ write: chunk => {
-                                var t = typeof chunk === 'string' ? chunk : new TextDecoder().decode(chunk);
-                                var iframe = document.createElement('iframe');
-                                iframe.style.display = 'none';
-                                iframe.src = 'uart://write?' + encodeURIComponent(t);
-                                document.body.appendChild(iframe);
-                                setTimeout(function() { document.body.removeChild(iframe); }, 100);
-                            }}),
-                            open: () => Promise.resolve(),
-                            close: () => Promise.resolve()
-                        };
-                    }
-                    return this._port;
-                },
-                requestPort: function() { return Promise.resolve(navigator.serial._getPort()); },
-                getPorts: function() { return Promise.resolve([navigator.serial._getPort()]); }
-            };
-            window._uartDataReceived = function(d) {};
-        ";
+        };
+        navigator.serial = createSerialPort(0);
+        navigator.serial2 = createSerialPort(1);
+        window._uartDataReceived = function(d) {};
+    ";
 
             await MainWebView.EvaluateJavaScriptAsync(serialApi);
 
@@ -306,7 +287,7 @@ public partial class MainPage : ContentPage
                             if (MainWebView.IsLoaded && MainWebView.Handler?.PlatformView != null)
                             {
                                 MainWebView.EvaluateJavaScriptAsync(
-                                    $"if(window._stubController) window._stubController.enqueue(new TextEncoder().encode('{escaped}'))");
+                                    $"if(window._stubController{portId}) window._stubController{portId}.enqueue(new TextEncoder().encode('{escaped}'))");
                             }
                         }
                         catch { }
@@ -328,23 +309,24 @@ public partial class MainPage : ContentPage
         {
             await DisplayAlert("Ошибка", "Приложение не найдено", "OK");
             return;
-        }
-
-        try
-        {
-            var status = await Permissions.CheckStatusAsync<Permissions.LocationWhenInUse>();
-            if (status != PermissionStatus.Granted)
-            {
-                status = await Permissions.RequestAsync<Permissions.LocationWhenInUse>();
-            }
-        }
-        catch { /* игнорируем если не вышло */ }
+        }        
 
         _currentAppName = appName;
         LoadingIndicator.IsVisible = true;
 
         if (appName == "AzimuthWebSuite")
         {
+
+            try
+            {
+                var status = await Permissions.CheckStatusAsync<Permissions.LocationWhenInUse>();
+                if (status != PermissionStatus.Granted)
+                {
+                    status = await Permissions.RequestAsync<Permissions.LocationWhenInUse>();
+                }
+            }
+            catch { }
+
             if (!_usbService.IsAnyPortOpen)
             {
                 if (!await _usbService.TryConnectAsync(0, 9600))
