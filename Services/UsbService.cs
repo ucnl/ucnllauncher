@@ -5,12 +5,18 @@ using Hoho.Android.UsbSerial.Driver;
 
 namespace UCNLLauncher.Services;
 
+public class UsbPortInfo
+{
+    public IUsbSerialPort Port { get; set; } = null!;
+    public UsbDeviceConnection Connection { get; set; } = null!;
+    public UsbDevice Device { get; set; } = null!;
+    public bool IsOpen { get; set; }
+}
+
 public class UsbService
 {
     private readonly UsbManager _usbManager;
-    private IUsbSerialPort? _port;
-    private UsbDeviceConnection? _connection;
-    private bool _isOpen;
+    private readonly Dictionary<int, UsbPortInfo> _ports = new();
 
     public UsbService()
     {
@@ -19,50 +25,63 @@ public class UsbService
             ?? throw new Exception("USB Service not available");
     }
 
-    public bool IsDeviceConnected => _isOpen && _port != null && _connection != null;
+    public bool IsPortOpen(int portId) =>
+        _ports.TryGetValue(portId, out var p) && p.IsOpen && p.Port != null && p.Connection != null;
 
-    public async Task<bool> TryConnectAsync()
+    public bool IsAnyPortOpen => _ports.Values.Any(p => p.IsOpen);
+
+    public async Task<bool> TryConnectAsync(int portId = 0, int baudRate = 9600)
     {
         try
         {
-            Close();
+            ClosePort(portId);
 
             foreach (var device in _usbManager.DeviceList!.Values!)
             {
                 var prober = UsbSerialProber.DefaultProber;
                 var driver = prober.ProbeDevice(device);
 
-                if (driver != null)
+                if (driver == null) continue;
+
+                // Пропускаем уже занятые устройства
+                if (_ports.Values.Any(p => p.IsOpen && p.Device.DeviceId == device.DeviceId))
+                    continue;
+
+                if (!_usbManager.HasPermission(device))
                 {
-                    if (!_usbManager.HasPermission(device))
-                    {
-                        var granted = await RequestPermissionAsync(device);
-                        if (!granted) continue;
-                    }
-
-                    _connection = _usbManager.OpenDevice(device);
-                    if (_connection == null) continue;
-
-                    var portsProperty = driver.GetType().GetProperty("Ports");
-                    var ports = portsProperty?.GetValue(driver) as System.Collections.IList;
-                    if (ports == null || ports.Count == 0) continue;
-
-                    _port = ports[0] as IUsbSerialPort;
-                    if (_port == null) continue;
-
-                    _port.Open(_connection);
-                    _port.SetParameters(9600, 8, StopBits.One, Parity.None);
-                    _isOpen = true;
-
-                    System.Diagnostics.Debug.WriteLine($"Connected: {device.VendorId:X}:{device.ProductId:X}");
-                    return true;
+                    var granted = await RequestPermissionAsync(device);
+                    if (!granted) continue;
                 }
+
+                var connection = _usbManager.OpenDevice(device);
+                if (connection == null) continue;
+
+                var portsProperty = driver.GetType().GetProperty("Ports");
+                var ports = portsProperty?.GetValue(driver) as System.Collections.IList;
+                if (ports == null || ports.Count == 0) continue;
+
+                var port = ports[0] as IUsbSerialPort;
+                if (port == null) continue;
+
+                port.Open(connection);
+                port.SetParameters(baudRate, 8, StopBits.One, Parity.None);
+
+                _ports[portId] = new UsbPortInfo
+                {
+                    Port = port,
+                    Connection = connection,
+                    Device = device,
+                    IsOpen = true
+                };
+
+                System.Diagnostics.Debug.WriteLine($"Connected port {portId}: {device.VendorId:X}:{device.ProductId:X} @ {baudRate}");
+                return true;
             }
             return false;
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"USB error: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"USB error (port {portId}): {ex.Message}");
             return false;
         }
     }
@@ -81,75 +100,80 @@ public class UsbService
             t.Result is Task<bool> bt && bt.Result);
     }
 
-    public async Task<string?> ReadAsync(int timeoutMs = 1000)
+    public async Task<string?> ReadAsync(int portId, int timeoutMs = 1000)
     {
-        if (!_isOpen || _port == null || _connection == null)
+        if (!_ports.TryGetValue(portId, out var p) || !p.IsOpen || p.Port == null || p.Connection == null)
             return null;
 
         try
         {
             var buffer = new byte[1024];
-            var result = await Task.Run(() => _port.Read(buffer, timeoutMs));
+            var result = await Task.Run(() => p.Port.Read(buffer, timeoutMs));
             if (result > 0)
                 return System.Text.Encoding.ASCII.GetString(buffer, 0, result);
         }
         catch (Java.IO.IOException)
         {
-            // Устройство отключено — нормально
-            _isOpen = false;
+            p.IsOpen = false;
         }
         catch (ObjectDisposedException)
         {
-            _isOpen = false;
+            p.IsOpen = false;
         }
         catch (NullReferenceException)
         {
-            _isOpen = false;
+            p.IsOpen = false;
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"Read error: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"Read error (port {portId}): {ex.Message}");
         }
         return null;
     }
 
-    public async Task<bool> WriteAsync(string data)
+    public async Task<bool> WriteAsync(int portId, string data)
     {
-        if (!_isOpen || _port == null || _connection == null)
+        if (!_ports.TryGetValue(portId, out var p) || !p.IsOpen || p.Port == null || p.Connection == null)
             return false;
 
         try
         {
             var bytes = System.Text.Encoding.ASCII.GetBytes(data);
-            await Task.Run(() => _port.Write(bytes, 1000));
+            await Task.Run(() => p.Port.Write(bytes, 1000));
             return true;
         }
         catch (Java.IO.IOException)
         {
-            _isOpen = false;
+            p.IsOpen = false;
             return false;
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"Write error: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"Write error (port {portId}): {ex.Message}");
             return false;
         }
     }
 
-    public void Close()
+    public void ClosePort(int portId)
     {
+        if (!_ports.TryGetValue(portId, out var p)) return;
+
         try
         {
-            _port?.Close();
-            try { (_port as IDisposable)?.Dispose(); } catch { }
+            p.Port?.Close();
+            try { (p.Port as IDisposable)?.Dispose(); } catch { }
         }
         catch { }
 
-        try { _connection?.Close(); } catch { }
+        try { p.Connection?.Close(); } catch { }
 
-        _port = null;
-        _connection = null;
-        _isOpen = false;
+        _ports.Remove(portId);
+    }
+
+    public void CloseAll()
+    {
+        foreach (var portId in _ports.Keys.ToList())
+            ClosePort(portId);
     }
 }
 
