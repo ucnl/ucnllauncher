@@ -176,11 +176,14 @@
             <span class="status-dot" id="statusDot"></span>
             <span id="statusText">Проверка USB...</span>
         </div>
+
+        <div class="status-bar" style="margin-top: 16px; cursor: pointer;" onclick="confirmClearCache()">
+            🗑 Очистить кэш приложений
+        </div>
+
     </div>
 
     <script>
-        // Функция launchApp будет переопределена из C# через EvaluateJavaScriptAsync
-        // Здесь оставляем заглушку на случай, если мост ещё не загрузился
         window.originalLaunchApp = function (appName) {
             window.location.href = 'app://' + appName;
         };
@@ -189,7 +192,6 @@
             window.launchApp = window.originalLaunchApp;
         }
 
-        // Функция обновления статуса USB (вызывается из C#)
         window.updateUsbStatus = function (connected) {
             var dot = document.getElementById('statusDot');
             var text = document.getElementById('statusText');
@@ -200,6 +202,12 @@
             } else {
                 dot.className = 'status-dot';
                 text.textContent = 'USB устройство не найдено';
+            }
+        };
+
+        window.confirmClearCache = function () {
+            if (confirm('Очистить кэш всех приложений? После очистки потребуется интернет для первого запуска.')) {
+                window.location.href = 'app://clear_cache';
             }
         };
     </script>

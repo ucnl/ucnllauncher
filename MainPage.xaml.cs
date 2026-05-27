@@ -26,8 +26,24 @@ public partial class MainPage : ContentPage
         _usbService = new UsbService();
         _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
         MainWebView.Navigating += OnNavigating;
-        MainWebView.Navigated += OnNavigated;
+        MainWebView.Navigated += OnNavigated;       
+
         LoadLauncher();
+
+        ConfigureWebViewCache();
+    }
+
+    private void ConfigureWebViewCache()
+    {
+#if ANDROID
+        MainWebView.HandlerChanged += (s, e) =>
+        {
+            if (MainWebView.Handler?.PlatformView is Android.Webkit.WebView androidWebView)
+            {
+                androidWebView.Settings.CacheMode = Android.Webkit.CacheModes.CacheElseNetwork;
+            }
+        };
+#endif
     }
 
     private void LoadLauncher()
@@ -50,7 +66,11 @@ public partial class MainPage : ContentPage
         if (e.Url.StartsWith("app://"))
         {
             e.Cancel = true;
-            LaunchApp(e.Url.Replace("app://", ""));
+            var appName = e.Url.Replace("app://", "");
+            if (appName == "clear_cache")
+                ClearAllCache();
+            else
+                LaunchApp(appName);
         }
         else if (e.Url.StartsWith("uart://write?"))
         {
@@ -89,6 +109,21 @@ public partial class MainPage : ContentPage
                 }
             }
         }
+    }
+
+    private async void ClearAllCache()
+    {
+        foreach (var key in _appUrls.Keys)
+            Preferences.Remove(key + "_cache");
+
+#if ANDROID
+        if (MainWebView.Handler?.PlatformView is Android.Webkit.WebView androidWebView)
+        {
+            androidWebView.ClearCache(true);
+        }
+#endif
+
+        await DisplayAlert("Кэш", "Кэш всех приложений очищен.", "OK");
     }
 
     private async Task InjectLauncherScript()
@@ -294,6 +329,16 @@ public partial class MainPage : ContentPage
             await DisplayAlert("Ошибка", "Приложение не найдено", "OK");
             return;
         }
+
+        try
+        {
+            var status = await Permissions.CheckStatusAsync<Permissions.LocationWhenInUse>();
+            if (status != PermissionStatus.Granted)
+            {
+                status = await Permissions.RequestAsync<Permissions.LocationWhenInUse>();
+            }
+        }
+        catch { /* игнорируем если не вышло */ }
 
         _currentAppName = appName;
         LoadingIndicator.IsVisible = true;
