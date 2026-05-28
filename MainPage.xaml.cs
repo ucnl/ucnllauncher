@@ -17,7 +17,8 @@ public partial class MainPage : ContentPage
         { "uWaver", "https://docs.unavlab.com/uWaver/" },
         { "RedPhoneDXConfig", "https://docs.unavlab.com/RedPhoneDXConfig-Web/" },
         { "uConsole", "https://docs.unavlab.com/uConsole/" },
-        { "AzimuthWebSuite", "https://docs.unavlab.com/AzimuthWebSuite/" }
+        { "AzimuthWebSuite", "https://docs.unavlab.com/AzimuthWebSuite/" },
+        { "uGNSSMonitor", "https://docs.unavlab.com/uGNSS-Monitor/" }
     };
 
     public MainPage()
