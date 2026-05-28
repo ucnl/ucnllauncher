@@ -26,7 +26,7 @@
 
 		<!-- Минимальная версия Android 5.0 (API 21) для поддержки USB Host -->
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21.0</SupportedOSPlatformVersion>
-		<AndroidSigningKeyStore>my-release-key.keystore</AndroidSigningKeyStore>
+		<AndroidSigningKeyStore>..\my-release-key.keystore</AndroidSigningKeyStore>
 		
 	</PropertyGroup>
 
