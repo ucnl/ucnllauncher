@@ -98,6 +98,32 @@ public partial class MainPage : ContentPage
             var data = parts.Length > 1 ? parts[1] : raw;
             _ = Task.Run(() => _usbService.WriteAsync(portId, data));
         }
+        else if (e.Url.StartsWith("uart://setbaud?"))
+        {
+            e.Cancel = true;
+            var raw = Uri.UnescapeDataString(e.Url.Replace("uart://setbaud?", ""));
+            var parts = raw.Split('|', 2);
+            int portId = parts.Length > 0 && int.TryParse(parts[0], out var id) ? id : 0;
+            int baudRate = parts.Length > 1 && int.TryParse(parts[1], out var br) ? br : 9600;
+
+            System.Diagnostics.Debug.WriteLine($"[Stub] SetBaud port={portId} baud={baudRate}");
+
+            _ = Task.Run(async () =>
+            {
+                _usbService.ClosePort(portId);
+                await Task.Delay(300);
+                await _usbService.TryConnectAsync(portId, baudRate);
+            });
+        }
+        else if (e.Url.StartsWith("uart://close?"))
+        {
+            e.Cancel = true;
+            var raw = Uri.UnescapeDataString(e.Url.Replace("uart://close?", ""));
+            int portId = int.TryParse(raw, out var id) ? id : 0;
+
+            System.Diagnostics.Debug.WriteLine($"[Stub] Close port={portId}");
+            _usbService.ClosePort(portId);
+        }
     }
 
     private async void OnNavigated(object? sender, WebNavigatedEventArgs e)
@@ -200,6 +226,17 @@ public partial class MainPage : ContentPage
     {
         try
         {
+            // Инициализируем стуб
+            string initStub = $@"
+            if (window._initStub) {{
+                window._initStub({{
+                    appName: '{_currentAppName}',
+                    preferredPort: 0
+                }});
+            }}
+        ";
+            await MainWebView.EvaluateJavaScriptAsync(initStub);
+
             string serialApi = @"
         var createSerialPort = function(portId) {
             return {
@@ -224,7 +261,7 @@ public partial class MainPage : ContentPage
         navigator.serial = createSerialPort(0);
         navigator.serial2 = createSerialPort(1);
         window._uartDataReceived = function(d) {};
-    ";
+        ";
 
             await MainWebView.EvaluateJavaScriptAsync(serialApi);
 
@@ -337,7 +374,19 @@ public partial class MainPage : ContentPage
                     return;
                 }
             }
-            _ = _usbService.TryConnectAsync(1, 38400);
+            _ = _usbService.TryConnectAsync(1, 0);
+        }
+        else if (appName == "uGNSSMonitor")
+        {
+            _usbService.CloseAll();  // закрываем предыдущие подключения
+            await Task.Delay(300);
+
+            if (!await _usbService.TryConnectAsync(0))  // без baud rate
+            {
+                LoadingIndicator.IsVisible = false;
+                await DisplayAlert("USB", "GNSS не найден", "OK");
+                return;
+            }
         }
         else
         {

@@ -38,14 +38,13 @@ public class UsbService
 
             foreach (var device in _usbManager.DeviceList!.Values!)
             {
+                if (_ports.Values.Any(p => p.IsOpen && p.Device.DeviceId == device.DeviceId))
+                    continue;
+
                 var prober = UsbSerialProber.DefaultProber;
                 var driver = prober.ProbeDevice(device);
 
                 if (driver == null) continue;
-
-                // Пропускаем уже занятые устройства
-                if (_ports.Values.Any(p => p.IsOpen && p.Device.DeviceId == device.DeviceId))
-                    continue;
 
                 if (!_usbManager.HasPermission(device))
                 {
@@ -74,7 +73,7 @@ public class UsbService
                     IsOpen = true
                 };
 
-                System.Diagnostics.Debug.WriteLine($"Connected port {portId}: {device.VendorId:X}:{device.ProductId:X} @ {baudRate}");
+                System.Diagnostics.Debug.WriteLine($"Connected port {portId}: VID=0x{device.VendorId:X4} PID=0x{device.ProductId:X4} @ {baudRate}");
                 return true;
             }
             return false;
