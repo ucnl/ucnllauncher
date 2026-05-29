@@ -80,7 +80,14 @@ public partial class MainPage : ContentPage
 
     private void OnNavigating(object? sender, WebNavigatingEventArgs e)
     {
-        if (e.Url.StartsWith("app://"))
+        if (e.Url.StartsWith("app://savefile?"))
+        {
+            e.Cancel = true;
+            System.Diagnostics.Debug.WriteLine("[Nav] SaveFile intercepted");
+            var raw = Uri.UnescapeDataString(e.Url.Replace("app://savefile?", ""));
+            HandleFileSave("file://save?" + raw);
+        }
+        else if (e.Url.StartsWith("app://"))
         {
             e.Cancel = true;
             var appName = e.Url.Replace("app://", "");
@@ -413,66 +420,74 @@ public partial class MainPage : ContentPage
     {
         try
         {
+            System.Diagnostics.Debug.WriteLine($"[FileSave] Received URL");
+
             var raw = Uri.UnescapeDataString(url.Replace("file://save?", ""));
             var parts = raw.Split('|', 2);
 
-            if (parts.Length < 2) return;
+            if (parts.Length < 2)
+            {
+                System.Diagnostics.Debug.WriteLine("[FileSave] ERROR: No base64 content");
+                return;
+            }
 
             var filename = parts[0];
             var base64Content = parts[1];
 
             var bytes = Convert.FromBase64String(base64Content);
 
-            MainThread.BeginInvokeOnMainThread(() =>
-            {
-                _ = SaveFileToDownloadsAsync(filename, bytes);
-            });
+            System.Diagnostics.Debug.WriteLine($"[FileSave] {filename}: {bytes.Length} bytes");
+
+            // Сохраняем во временный файл и открываем Sharesheet
+            ShareFile(filename, bytes);
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[FileSave] Error: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"[FileSave] EXCEPTION: {ex.GetType().Name}: {ex.Message}");
+            MainThread.BeginInvokeOnMainThread(async () =>
+            {
+                await DisplayAlert("Ошибка", $"Не удалось подготовить файл:\n{ex.Message}", "OK");
+            });
         }
     }
 
-    private async Task SaveFileToDownloadsAsync(string filename, byte[] bytes)
+    private void ShareFile(string filename, byte[] bytes)
     {
+#if ANDROID
         try
         {
-#if ANDROID
-            var downloadsPath = Android.OS.Environment.GetExternalStoragePublicDirectory(
-                Android.OS.Environment.DirectoryDownloads)?.AbsolutePath;
+            // Сохраняем в кэш
+            var tempPath = System.IO.Path.Combine(FileSystem.CacheDirectory, filename);
+            System.IO.File.WriteAllBytes(tempPath, bytes);
+            System.Diagnostics.Debug.WriteLine($"[FileSave] Temp file: {tempPath}");
 
-            if (string.IsNullOrEmpty(downloadsPath))
-            {
-                downloadsPath = System.IO.Path.Combine(
-                    Android.App.Application.Context.GetExternalFilesDir(null)?.AbsolutePath
-                    ?? FileSystem.CacheDirectory,
-                    "Downloads");
-            }
+            var file = new Java.IO.File(tempPath);
+            var uri = AndroidX.Core.Content.FileProvider.GetUriForFile(
+                Android.App.Application.Context,
+                "com.unavlab.ucnllauncher.fileprovider",
+                file);
 
-            System.IO.Directory.CreateDirectory(downloadsPath);
+            var intent = new Android.Content.Intent(Android.Content.Intent.ActionSend);
+            intent.SetType("*/*");
+            intent.PutExtra(Android.Content.Intent.ExtraStream, uri);
+            intent.AddFlags(Android.Content.ActivityFlags.GrantReadUriPermission);
+            intent.AddFlags(Android.Content.ActivityFlags.NewTask);
 
-            var filePath = System.IO.Path.Combine(downloadsPath, filename);
+            var chooser = Android.Content.Intent.CreateChooser(intent, $"Сохранить {filename}");
+            chooser.AddFlags(Android.Content.ActivityFlags.NewTask);
 
-            // Если файл существует — добавляем номер
-            int counter = 1;
-            var nameWithoutExt = System.IO.Path.GetFileNameWithoutExtension(filename);
-            var ext = System.IO.Path.GetExtension(filename);
-            while (System.IO.File.Exists(filePath))
-            {
-                filePath = System.IO.Path.Combine(downloadsPath, $"{nameWithoutExt}_{counter}{ext}");
-                counter++;
-            }
-
-            await System.IO.File.WriteAllBytesAsync(filePath, bytes);
-
-            await DisplayAlert("Сохранено", $"Файл сохранён:\n{System.IO.Path.GetFileName(filePath)}", "OK");
-#endif
+            Android.App.Application.Context.StartActivity(chooser);
+            System.Diagnostics.Debug.WriteLine("[FileSave] ShareSheet opened");
         }
         catch (Exception ex)
         {
-            await DisplayAlert("Ошибка", $"Не удалось сохранить:\n{ex.Message}", "OK");
+            System.Diagnostics.Debug.WriteLine($"[FileSave] Share error: {ex.Message}");
+            MainThread.BeginInvokeOnMainThread(async () =>
+            {
+                await DisplayAlert("Ошибка", ex.Message, "OK");
+            });
         }
+#endif
     }
 
     protected override void OnDisappearing()

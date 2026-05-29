@@ -17,5 +17,14 @@
 			</intent-filter>
 			<meta-data android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" android:resource="@xml/device_filter" />
 		</activity>
+		<provider
+    android:name="androidx.core.content.FileProvider"
+    android:authorities="com.unavlab.ucnllauncher.fileprovider"
+    android:exported="false"
+    android:grantUriPermissions="true">
+			<meta-data
+				android:name="android.support.FILE_PROVIDER_PATHS"
+				android:resource="@xml/file_paths" />
+		</provider>
 	</application>
 </manifest>
