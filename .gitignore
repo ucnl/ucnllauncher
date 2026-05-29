@@ -7,6 +7,9 @@
 *.userosscache
 *.sln.docstates
 *.keystore
+*.jks
+*.p12
+*.pfx
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
@@ -69,7 +72,6 @@ artifacts/
 *.pidb
 *.svclog
 *.scc
-.keystore
 
 # Chutzpah Test files
 _Chutzpah*

@@ -1,24 +1,19 @@
-﻿(function () {
-    if (typeof window._uartDataReceived === 'undefined') return;
-
+﻿// device-adapter.js — Адаптер для связи WebView с нативным USB
+// v2 — работает совместно с webview-stub.js, не переопределяет navigator.serial
+(function () {
     console.log('[Adapter] Native bridge found, activating...');
 
-    var port = navigator.serial._port;
-    if (!port) return;
+    // Не переопределяем navigator.serial — webview-stub.js уже сделал это
+    // Только логируем для диагностики
+    if (navigator.serial && navigator.serial.requestPort) {
+        console.log('[Adapter] navigator.serial already available (webview-stub)');
+    } else {
+        console.log('[Adapter] WARNING: navigator.serial not found!');
+    }
 
-    port.onDataReceived = function (data) {
-        console.log('[Adapter] Data:', data);
-    };
-
-    window._uartPort = port;
-
-    // Перехватываем данные от native
-    var originalHandler = window._uartDataReceived;
+    // Для обратной совместимости со старыми приложениями
     window._uartDataReceived = function (data) {
-        if (window._uartPort && window._uartPort.onDataReceived) {
-            window._uartPort.onDataReceived(data);
-        }
-        if (originalHandler) originalHandler(data);
+        console.log('[Adapter] Native data: ' + (data ? data.length : 0) + ' bytes');
     };
 
     console.log('[Adapter] Ready');

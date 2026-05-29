@@ -115,6 +115,11 @@ public partial class MainPage : ContentPage
                 await _usbService.TryConnectAsync(portId, baudRate);
             });
         }
+        else if (e.Url.StartsWith("file://save?"))
+        {
+            e.Cancel = true;
+            HandleFileSave(e.Url);
+        }
         else if (e.Url.StartsWith("uart://close?"))
         {
             e.Cancel = true;
@@ -237,34 +242,7 @@ public partial class MainPage : ContentPage
         ";
             await MainWebView.EvaluateJavaScriptAsync(initStub);
 
-            string serialApi = @"
-        var createSerialPort = function(portId) {
-            return {
-                requestPort: function() {
-                    return Promise.resolve({
-                        readable: new ReadableStream({ start: function(c) { window['_stubController' + portId] = c; } }),
-                        writable: new WritableStream({ write: function(chunk) {
-                            var t = typeof chunk === 'string' ? chunk : new TextDecoder().decode(chunk);
-                            var iframe = document.createElement('iframe');
-                            iframe.style.display = 'none';
-                            iframe.src = 'uart://write?' + encodeURIComponent(portId + '|' + t);
-                            document.body.appendChild(iframe);
-                            setTimeout(function() { document.body.removeChild(iframe); }, 100);
-                        }}),
-                        open: function() { return Promise.resolve(); },
-                        close: function() { return Promise.resolve(); }
-                    });
-                },
-                getPorts: function() { return Promise.resolve([]); }
-            };
-        };
-        navigator.serial = createSerialPort(0);
-        navigator.serial2 = createSerialPort(1);
-        window._uartDataReceived = function(d) {};
-        ";
-
-            await MainWebView.EvaluateJavaScriptAsync(serialApi);
-
+            // Загружаем device-adapter.js (он уже не ломает navigator.serial)
             using var stream = await FileSystem.OpenAppPackageFileAsync("device-adapter.js");
             using var reader = new StreamReader(stream);
             await MainWebView.EvaluateJavaScriptAsync(await reader.ReadToEndAsync());
@@ -428,6 +406,72 @@ public partial class MainPage : ContentPage
         {
             LoadingIndicator.IsVisible = false;
             await DisplayAlert("Нет сети", "Приложение недоступно офлайн", "OK");
+        }
+    }
+
+    private void HandleFileSave(string url)
+    {
+        try
+        {
+            var raw = Uri.UnescapeDataString(url.Replace("file://save?", ""));
+            var parts = raw.Split('|', 2);
+
+            if (parts.Length < 2) return;
+
+            var filename = parts[0];
+            var base64Content = parts[1];
+
+            var bytes = Convert.FromBase64String(base64Content);
+
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                _ = SaveFileToDownloadsAsync(filename, bytes);
+            });
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[FileSave] Error: {ex.Message}");
+        }
+    }
+
+    private async Task SaveFileToDownloadsAsync(string filename, byte[] bytes)
+    {
+        try
+        {
+#if ANDROID
+            var downloadsPath = Android.OS.Environment.GetExternalStoragePublicDirectory(
+                Android.OS.Environment.DirectoryDownloads)?.AbsolutePath;
+
+            if (string.IsNullOrEmpty(downloadsPath))
+            {
+                downloadsPath = System.IO.Path.Combine(
+                    Android.App.Application.Context.GetExternalFilesDir(null)?.AbsolutePath
+                    ?? FileSystem.CacheDirectory,
+                    "Downloads");
+            }
+
+            System.IO.Directory.CreateDirectory(downloadsPath);
+
+            var filePath = System.IO.Path.Combine(downloadsPath, filename);
+
+            // Если файл существует — добавляем номер
+            int counter = 1;
+            var nameWithoutExt = System.IO.Path.GetFileNameWithoutExtension(filename);
+            var ext = System.IO.Path.GetExtension(filename);
+            while (System.IO.File.Exists(filePath))
+            {
+                filePath = System.IO.Path.Combine(downloadsPath, $"{nameWithoutExt}_{counter}{ext}");
+                counter++;
+            }
+
+            await System.IO.File.WriteAllBytesAsync(filePath, bytes);
+
+            await DisplayAlert("Сохранено", $"Файл сохранён:\n{System.IO.Path.GetFileName(filePath)}", "OK");
+#endif
+        }
+        catch (Exception ex)
+        {
+            await DisplayAlert("Ошибка", $"Не удалось сохранить:\n{ex.Message}", "OK");
         }
     }
 
